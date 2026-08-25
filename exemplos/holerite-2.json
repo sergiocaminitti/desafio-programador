@@ -1,0 +1,74 @@
+{
+  "pages": [
+    {
+      "page": 1,
+      "year": "2020",
+      "month": "01",
+      "fields": [
+        {
+          "code": "0010",
+          "label": "Salario Base",
+          "reference": "220,00",
+          "value": "3.500,00"
+        },
+        {
+          "code": "0045",
+          "label": "Adicional Noturno",
+          "reference": "20,00",
+          "value": "350,00"
+        },
+        {
+          "code": "0998",
+          "label": "INSS",
+          "reference": "14,00%",
+          "value": "450,00"
+        }
+      ],
+      "bases": [
+        {
+          "label": "Base INSS",
+          "value": "3.850,00"
+        },
+        {
+          "label": "Base INSS",
+          "value": "3.400,00"
+        }
+      ]
+    },
+    {
+      "page": 2,
+      "year": "2020",
+      "month": "02",
+      "fields": [
+        {
+          "code": "0010",
+          "label": "Salario Base",
+          "reference": "220,00",
+          "value": "3.500,00"
+        },
+        {
+          "code": "5560",
+          "label": "Horas Extras - 50%",
+          "reference": "12,00",
+          "value": "280,00"
+        },
+        {
+          "code": "0998",
+          "label": "INSS",
+          "reference": "14,00%",
+          "value": "460,00"
+        }
+      ],
+      "bases": [
+        {
+          "label": "Base INSS",
+          "value": "3.780,00"
+        },
+        {
+          "label": "Base INSS",
+          "value": "3.320,00"
+        }
+      ]
+    }
+  ]
+}
