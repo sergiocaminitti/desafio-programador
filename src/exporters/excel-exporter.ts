@@ -209,8 +209,51 @@ export async function generatePayrollExcel(value: PayrollValue): Promise<Buffer>
     }
   }
 
+  // 6. Adiciona aba de Bases e Totais separada
+  addBasesWorksheet(workbook, value);
+
   const arrayBuffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(arrayBuffer);
+}
+
+/**
+ * Gera a aba "Bases e Totais" de um workbook de holerite.
+ * Cada linha representa uma base de cálculo/total de uma página.
+ */
+function addBasesWorksheet(workbook: ExcelJS.Workbook, value: PayrollValue): void {
+  const ws = workbook.addWorksheet('Bases e Totais');
+
+  ws.columns = [
+    { header: 'Pág.', key: 'page', width: 10 },
+    { header: 'Mês', key: 'month', width: 10 },
+    { header: 'Ano', key: 'year', width: 12 },
+    { header: 'Base / Total', key: 'label', width: 36 },
+    { header: 'Valor', key: 'value', width: 18 },
+  ];
+
+  // Estiliza o cabeçalho
+  const headerRow = ws.getRow(1);
+  headerRow.height = 26;
+  headerRow.eachCell((cell) => {
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_FILL_COLOR } };
+    cell.font = { bold: true, color: { argb: HEADER_FONT_COLOR }, size: 11 };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+  });
+
+  for (const page of value.pages) {
+    for (const base of page.bases) {
+      const row = ws.addRow({
+        page: page.page,
+        month: page.month,
+        year: page.year,
+        label: base.label,
+        value: base.value,
+      });
+      row.height = 20;
+      // Alinha valor à direita
+      row.getCell('value').alignment = { horizontal: 'right' };
+    }
+  }
 }
 
 /**

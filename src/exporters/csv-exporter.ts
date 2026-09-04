@@ -75,6 +75,20 @@ export function generatePayrollCsv(value: PayrollValue): string {
     lines.push(row.map(escapeCsvCell).join(','));
   }
 
+  // ── Seção de Bases e Totais ──
+  const hasAnyBase = value.pages.some((p) => p.bases.length > 0);
+  if (hasAnyBase) {
+    const baseHeaders = ['Pág.', 'Mês', 'Ano', 'Base / Total', 'Valor'];
+    lines.push('', ''); // Separador visual
+    lines.push(baseHeaders.map(escapeCsvCell).join(','));
+    for (const page of value.pages) {
+      for (const base of page.bases) {
+        const row: (string | number)[] = [page.page, page.month, page.year, base.label, base.value];
+        lines.push(row.map(escapeCsvCell).join(','));
+      }
+    }
+  }
+
   return '\uFEFF' + lines.join('\r\n');
 }
 
