@@ -1,4 +1,4 @@
-import { createCanvas, Path2D, DOMMatrix, ImageData, Image, loadImage } from '@napi-rs/canvas';
+import { Path2D, DOMMatrix, ImageData, Image } from '@napi-rs/canvas';
 
 // Registra polyfills nativos de canvas antes de carregar o motor de PDF
 (globalThis as any).Path2D = Path2D;
@@ -8,7 +8,7 @@ import { createCanvas, Path2D, DOMMatrix, ImageData, Image, loadImage } from '@n
 
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { renderPageAsImage } from 'unpdf';
-import { performOcr, performOcrBestOf, scoreOcrText, performOcrQuinzenaWords, type OcrWord } from './ocr.js';
+import { performOcr, scoreOcrText, type OcrWord } from './ocr.js';
 
 export interface ExtractedToken {
   text: string;
@@ -117,74 +117,6 @@ export function groupTokensIntoLines(tokens: ExtractedToken[]): ExtractedLine[] 
       tokens: line.tokens,
     };
   }).filter((line) => line.text.length > 0);
-}
-
-/**
- * Pré-processa uma imagem PNG/JPEG para melhorar a qualidade do OCR.
- *
- * Aplica normalização de contraste adaptativa (normalização por percentis 5%/95%)
- * convertendo a imagem para escala de cinza.
- *
- * NÃO aplica threshold/binarização agressiva pois isso piora documentos que
- * já têm bom contraste — causa destruição de caracteres em fontes finas.
- * O threshold só é aplicado se o contraste da imagem for muito baixo
- * (range de tons < 80 após normalização indica documento muito apagado).
- */
-async function enhanceImageForOcr(imageBuffer: Buffer): Promise<Buffer> {
-  try {
-    const img = await loadImage(imageBuffer);
-    const canvas = createCanvas(img.width, img.height);
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imgData.data;
-
-    // 1. Converte para escala de cinza (Rec. 601 luminância)
-    const gray = new Uint8Array(data.length / 4);
-    for (let i = 0; i < data.length; i += 4) {
-      gray[i >> 2] = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
-    }
-
-    // 2. Calcula percentis 5% e 95% para normalização de contraste
-    const hist = new Uint32Array(256);
-    for (const g of gray) hist[g]++;
-    const totalPx = gray.length;
-    let lo = 0, hi = 255;
-    let cumLo = 0, cumHi = 0;
-    for (let v = 0; v < 256; v++) {
-      cumLo += hist[v];
-      if (cumLo / totalPx < 0.05) lo = v;
-    }
-    for (let v = 255; v >= 0; v--) {
-      cumHi += hist[v];
-      if (cumHi / totalPx < 0.05) hi = v;
-    }
-
-    const range = hi - lo;
-    // Se o range já é adequado (>= 80), a imagem tem contraste suficiente
-    // — aplica apenas normalização leve sem binarização
-    // Se o range é muito pequeno (< 80), o documento é de baixo contraste
-    // — aplica binarização para tentar recuperar o texto
-    const isLowContrast = range < 80;
-    const normalizedRange = range || 1;
-
-    for (let i = 0; i < data.length; i += 4) {
-      const idx = i >> 2;
-      let g = Math.round(((gray[idx] - lo) / normalizedRange) * 255);
-      g = Math.max(0, Math.min(255, g));
-
-      // Threshold agressivo apenas para documentos de baixo contraste
-      const out = isLowContrast ? (g < 128 ? 0 : 255) : g;
-      data[i] = data[i + 1] = data[i + 2] = out;
-    }
-
-    ctx.putImageData(imgData, 0, 0);
-    return canvas.toBuffer('image/png');
-  } catch (err) {
-    console.warn('[PDF Reader] Falha no pré-processamento OCR, usando imagem original:', err);
-    return imageBuffer;
-  }
 }
 
 /**

@@ -14,7 +14,6 @@ const TIME_REGEX = /\b([0-2?][0-9?][:hH.][0-5?][0-9?]|[0-9][:hH.][0-5?][0-9?])(?
 
 /** Dias da semana em português */
 const WEEKDAY_RE_SRC = 'SEG|TER|QUA|QUI|SEX|SAB|SÁB|DOM|FER';
-const WEEKDAY_RE = new RegExp(WEEKDAY_RE_SRC, 'i');
 
 /**
  * Linha-cabeçalho de dia no SIPON: "2 - SEG" ou "17 - TER"
@@ -439,8 +438,6 @@ function extractQuinzenaMonthYear(lines: ExtractedLine[]): { month: string; year
 //   Extra Saída:     > 85%    (0.85 – 1.00)
 //
 const COL_BOUNDS = [0.15, 0.35, 0.50, 0.63, 0.74, 0.85] as const;
-// índices: 0=DiaCol 1=ManhãEnt 2=ManhãSaí 3=TardeEnt 4=TardeSaí 5=ExtraEnt 6=ExtraSaí
-const COL_NAMES = ['dia', 'manhã-ent', 'manhã-saí', 'tarde-ent', 'tarde-saí', 'extra-ent', 'extra-saí'] as const;
 
 /** Mapeia a posição X (em pixels) à coluna da grade de quinzena */
 function xToQuinzenaCol(x: number, imageWidth: number): number {
@@ -500,7 +497,6 @@ function extractTimeFromToken(text: string): string | null {
  */
 function parseQuinzenaPage(
   lines: ExtractedLine[],
-  pageNumber: number,
   month: string,
   year: string,
   ocrWords?: OcrWord[],
@@ -829,7 +825,6 @@ export function extractTimeCard(doc: ExtractedDocument): TimeCardValue {
       const { month, year } = extractQuinzenaMonthYear(page.lines);
       const days = parseQuinzenaPage(
         page.lines,
-        page.pageNumber,
         month,
         year,
         page.ocrWords,
