@@ -14,6 +14,9 @@ describe('Payroll Extractor', () => {
     expect(isBaseLabel('Horas Extras - 50%')).toBe(false);
     expect(isBaseLabel('Adicional Noturno')).toBe(false);
     expect(isBaseLabel('Vale Transporte')).toBe(false);
+    expect(isBaseLabel('BASEDECALCULODOINSS')).toBe(true);
+    expect(isBaseLabel('Proventos Bruto')).toBe(true);
+    expect(isBaseLabel('Líquido')).toBe(true);
   });
 
   it('deve extrair competência ano e mês do cabeçalho', () => {
@@ -68,5 +71,21 @@ describe('Payroll Extractor', () => {
     expect(page.bases[0]).toEqual({ label: 'Base INSS', value: '2.545,68' });
     expect(page.bases[1]).toEqual({ label: 'Total Vencimentos', value: '2.545,68' });
     expect(page.bases[2]).toEqual({ label: 'Valor Líquido', value: '2.282,81' });
+  });
+
+  it('deve preservar valor negativo e tirar o código do label', () => {
+    const sampleLines = [
+      { y: 500, text: 'Mês/Ano: 08/2018 Folha de Pagamento: MÊS', tokens: [] },
+      { y: 450, text: '803 PREVI PESSOAL PB2 6.188,63 -433,20', tokens: [] },
+    ];
+    const page = parsePayrollPage(sampleLines, 1);
+    expect(page.month).toBe('08');
+    expect(page.year).toBe('2018');
+    expect(page.fields[0]).toEqual({
+      code: '803',
+      label: 'PREVI PESSOAL PB2',
+      reference: '6.188,63',
+      value: '-433,20',
+    });
   });
 });

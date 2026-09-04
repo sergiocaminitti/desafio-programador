@@ -28,8 +28,8 @@ export function isValidTimeOrUncertain(timeStr: string): boolean {
 export function isValidBrazilianCurrency(val: string): boolean {
   if (!val || val.trim() === '') return true;
   const clean = val.trim();
-  // Deve conter apenas dígitos, pontos separadores, vírgula decimal e '?'
-  return /^[\d\.,\?]+$/.test(clean);
+  // Formato: opcional sinal negativo, dígitos, separadores de milhar (.), vírgula decimal e '?'
+  return /^-?[\d\.]+,\d{2}$/.test(clean) || /^[\d\.,\?-]+$/.test(clean);
 }
 
 /**

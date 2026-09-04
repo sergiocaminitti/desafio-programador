@@ -3,6 +3,7 @@ import {
   normalizeTimeHHMM,
   isValidOrUncertainTime,
   parseTimeCardLine,
+  punchTimesFromSiponText,
 } from '../src/core/time-card-extractor.js';
 
 describe('Time Card Extractor', () => {
@@ -49,5 +50,14 @@ describe('Time Card Extractor', () => {
     expect(parsedEmpty).not.toBeNull();
     expect(parsedEmpty?.date_raw).toBe('25/05/2019');
     expect(parsedEmpty?.punches).toEqual([]);
+  });
+
+  it('deve ignorar jornada contratual e totalizadores HE no layout SIPON', () => {
+    expect(punchTimesFromSiponText('2 - SEG 08:00 09:03 14:05 HE-BCO DE HORAS 00:13', true)).toEqual([
+      '09:03',
+      '14:05',
+    ]);
+    expect(punchTimesFromSiponText('15:12 18:36 HE-REMUNERADA 00:13', false)).toEqual(['15:12', '18:36']);
+    expect(punchTimesFromSiponText('1 - DOM 08:00', true)).toEqual([]);
   });
 });
