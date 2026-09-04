@@ -1,304 +1,368 @@
 import React, { useState } from 'react';
 import { PayrollValue, PayrollPage, PayrollField, PayrollBase } from '@shared/types';
 import { computePayrollWarnings } from '@shared/warnings';
-import { AlertCircle, AlertTriangle, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle2,
+  Calendar,
+  Hash,
+  Tag,
+  BarChart2,
+} from 'lucide-react';
 
 interface PayrollGridProps {
   value: PayrollValue;
   onChange: (newValue: PayrollValue) => void;
 }
 
-export const PayrollGrid: React.FC<PayrollGridProps> = ({ value, onChange }) => {
-  const [expandedPages, setExpandedPages] = useState<Record<number, boolean>>({});
+// ─── helpers ────────────────────────────────────────────────────────────────
 
-  // 1. Extrai todas as verbas distintas (labels) na ordem de primeira aparição
-  const distinctLabels: string[] = [];
-  value.pages.forEach((page: PayrollPage) => {
-    page.fields.forEach((field: PayrollField) => {
-      if (field.label && !distinctLabels.includes(field.label)) {
-        distinctLabels.push(field.label);
-      }
-    });
-  });
+const MONTH_LABELS: Record<string, string> = {
+  '01': 'Janeiro', '02': 'Fevereiro', '03': 'Março',
+  '04': 'Abril',   '05': 'Maio',      '06': 'Junho',
+  '07': 'Julho',   '08': 'Agosto',    '09': 'Setembro',
+  '10': 'Outubro', '11': 'Novembro',  '12': 'Dezembro',
+};
 
-  // 2. Calcula avisos em tempo real
-  const warnings = computePayrollWarnings(value);
+function formatCompetencia(month: string, year: string): string {
+  const m = MONTH_LABELS[month] ?? month;
+  return m && year ? `${m} / ${year}` : month || year || '—';
+}
 
-  // Manipuladores de edição
-  const handlePageMetadataChange = (
-    pageIdx: number,
-    field: 'year' | 'month',
-    rawVal: string
-  ) => {
-    // Permite apenas dígitos e '?'
-    const maxLen = field === 'month' ? 2 : 4;
-    const newVal = rawVal.replace(/[^\d\?]/g, '').slice(0, maxLen);
+function hasUncertain(str: string) { return str.includes('?'); }
 
-    const updatedPages = [...value.pages];
-    updatedPages[pageIdx] = {
-      ...updatedPages[pageIdx],
-      [field]: newVal,
-    };
-    onChange({ pages: updatedPages });
+// ─── sub-components ──────────────────────────────────────────────────────────
+
+interface MoneyInputProps {
+  value: string;
+  placeholder?: string;
+  onChange: (v: string) => void;
+  className?: string;
+  style?: React.CSSProperties;
+}
+
+const MoneyInput: React.FC<MoneyInputProps> = ({ value, placeholder = '—', onChange, className = '', style }) => {
+  const isUncertain = hasUncertain(value);
+  return (
+    <input
+      type="text"
+      placeholder={placeholder}
+      className={`cell-input cell-input-money ${isUncertain ? 'uncertain-cell' : ''} ${className}`}
+      value={value}
+      style={style}
+      onChange={(e) => onChange(e.target.value.replace(/[^\d.,?-]/g, ''))}
+    />
+  );
+};
+
+// ─── FieldRow ────────────────────────────────────────────────────────────────
+
+interface FieldRowProps {
+  field: PayrollField;
+  onValueChange: (v: string) => void;
+  rowIndex: number;
+}
+
+const FieldRow: React.FC<FieldRowProps> = ({ field, onValueChange, rowIndex }) => {
+  const isEven = rowIndex % 2 === 0;
+  return (
+    <div
+      className="pr-field-row"
+      style={{ background: isEven ? 'transparent' : 'rgba(0,0,0,0.018)' }}
+    >
+      {/* Código */}
+      <span className="pr-field-code" title="Código da verba">
+        {field.code || <span style={{ opacity: 0.3 }}>—</span>}
+      </span>
+
+      {/* Label */}
+      <span className="pr-field-label" title={field.label}>
+        {field.label}
+      </span>
+
+      {/* Referência */}
+      <span className="pr-field-ref" title="Referência / quantidade">
+        {field.reference || <span style={{ opacity: 0.3 }}>—</span>}
+      </span>
+
+      {/* Valor (editável) */}
+      <div className="pr-field-value">
+        <MoneyInput
+          value={field.value}
+          onChange={onValueChange}
+        />
+      </div>
+    </div>
+  );
+};
+
+// ─── BaseChip ─────────────────────────────────────────────────────────────────
+
+interface BaseChipProps {
+  base: PayrollBase;
+  onValueChange: (v: string) => void;
+}
+
+const BaseChip: React.FC<BaseChipProps> = ({ base, onValueChange }) => (
+  <div className="pr-base-chip">
+    <span className="pr-base-chip-label" title={base.label}>{base.label}</span>
+    <MoneyInput
+      value={base.value}
+      onChange={onValueChange}
+      style={{ width: '108px', minWidth: '108px', fontSize: '0.8125rem', fontWeight: 600 }}
+    />
+  </div>
+);
+
+// ─── PageCard ────────────────────────────────────────────────────────────────
+
+interface PageCardProps {
+  page: PayrollPage;
+  pageIdx: number;
+  highlight: { color: string; reasons: string[]; hasLeftBorder: boolean } | undefined;
+  onFieldValueChange: (pageIdx: number, fieldIdx: number, val: string) => void;
+  onBaseValueChange: (pageIdx: number, baseIdx: number, val: string) => void;
+  onMetadataChange: (pageIdx: number, field: 'year' | 'month', val: string) => void;
+  defaultExpanded: boolean;
+}
+
+const PageCard: React.FC<PageCardProps> = ({
+  page,
+  pageIdx,
+  highlight,
+  onFieldValueChange,
+  onBaseValueChange,
+  onMetadataChange,
+  defaultExpanded,
+}) => {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+
+  const borderColor =
+    highlight?.color === 'red'
+      ? 'var(--warning-red-border)'
+      : highlight?.color === 'yellow'
+      ? 'var(--warning-yellow-border)'
+      : 'var(--apple-border)';
+
+  const headerBg =
+    highlight?.color === 'red'
+      ? 'var(--warning-red-bg)'
+      : highlight?.color === 'yellow'
+      ? 'var(--warning-yellow-bg)'
+      : 'rgba(245,245,250,0.95)';
+
+  // Aplica borda colorida de acordo com o estado
+  const cardStyle: React.CSSProperties = {
+    borderColor,
   };
-
-  const handleFieldValueChange = (
-    pageIdx: number,
-    label: string,
-    rawVal: string
-  ) => {
-    // Permite apenas dígitos, separadores monetários (. e ,) e caractere de incerteza (?)
-    const newVal = rawVal.replace(/[^\d\.,\?]/g, '');
-
-    const updatedPages = [...value.pages];
-    const page = updatedPages[pageIdx];
-    const existingFieldIdx = page.fields.findIndex((f: PayrollField) => f.label === label);
-
-    const updatedFields = [...page.fields];
-    if (existingFieldIdx >= 0) {
-      // Mantém o campo mesmo se vazio para a coluna NÃO sumir da tabela
-      updatedFields[existingFieldIdx] = {
-        ...updatedFields[existingFieldIdx],
-        value: newVal,
-      };
-    } else {
-      updatedFields.push({
-        code: '',
-        label,
-        reference: '',
-        value: newVal,
-      });
-    }
-
-    updatedPages[pageIdx] = {
-      ...page,
-      fields: updatedFields,
-    };
-    onChange({ pages: updatedPages });
-  };
-
-  const handleBaseValueChange = (
-    pageIdx: number,
-    baseIdx: number,
-    rawVal: string
-  ) => {
-    const newVal = rawVal.replace(/[^\d\.,\?]/g, '');
-    const updatedPages = [...value.pages];
-    const page = updatedPages[pageIdx];
-    const updatedBases = [...page.bases];
-
-    updatedBases[baseIdx] = {
-      ...updatedBases[baseIdx],
-      value: newVal,
-    };
-
-    updatedPages[pageIdx] = {
-      ...page,
-      bases: updatedBases,
-    };
-    onChange({ pages: updatedPages });
-  };
-
-  const togglePageExpand = (pageNum: number) => {
-    setExpandedPages((prev) => ({ ...prev, [pageNum]: !prev[pageNum] }));
-  };
+  if (highlight?.hasLeftBorder) {
+    cardStyle.borderLeft = '4px solid var(--warning-red-border)';
+  }
 
   return (
-    <div className="table-container">
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th style={{ width: '55px', minWidth: '55px', textAlign: 'center' }}>Pág.</th>
-            <th style={{ width: '65px', minWidth: '65px', textAlign: 'center' }}>Mês</th>
-            <th style={{ width: '80px', minWidth: '80px', textAlign: 'center' }}>Ano</th>
-            {distinctLabels.map((label: string, idx: number) => (
-              <th key={idx} style={{ minWidth: '135px', textAlign: 'right' }}>{label}</th>
-            ))}
-            <th style={{ width: '220px', minWidth: '220px' }}>Status & Auditoria</th>
-          </tr>
-        </thead>
-        <tbody>
-          {value.pages.map((page: PayrollPage, pageIdx: number) => {
-            const highlight = warnings.get(page.page);
+    <div
+      className="pr-page-card"
+      style={cardStyle}
+    >
+      {/* ── Card Header ── */}
+      <button
+        type="button"
+        className="pr-page-header"
+        style={{ background: headerBg }}
+        onClick={() => setExpanded((e) => !e)}
+        aria-expanded={expanded}
+      >
+        <div className="pr-page-header-left">
+          <span className="pr-page-chevron">
+            {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+          </span>
 
-            const rowClass =
-              highlight?.color === 'red'
-                ? 'row-red'
-                : highlight?.color === 'yellow'
-                ? 'row-yellow'
-                : '';
+          {/* Badge de Página */}
+          <span className="pr-page-badge">Pág. {page.page}</span>
 
-            const cellBorderClass = highlight?.hasLeftBorder ? 'cell-red-border' : '';
-            const isExpanded = !!expandedPages[page.page];
+          {/* Competência editável inline */}
+          <div className="pr-competencia" onClick={(e) => e.stopPropagation()}>
+            <Calendar size={13} style={{ opacity: 0.5 }} />
+            <input
+              type="text"
+              className={`pr-meta-input ${hasUncertain(page.month) ? 'uncertain-cell' : ''}`}
+              value={page.month}
+              placeholder="MM"
+              maxLength={2}
+              title="Mês"
+              style={{ width: '34px', textAlign: 'center' }}
+              onChange={(e) => onMetadataChange(pageIdx, 'month', e.target.value.replace(/[^\d?]/g, '').slice(0, 2))}
+            />
+            <span style={{ opacity: 0.4 }}>/</span>
+            <input
+              type="text"
+              className={`pr-meta-input ${hasUncertain(page.year) ? 'uncertain-cell' : ''}`}
+              value={page.year}
+              placeholder="AAAA"
+              maxLength={4}
+              title="Ano"
+              style={{ width: '48px', textAlign: 'center' }}
+              onChange={(e) => onMetadataChange(pageIdx, 'year', e.target.value.replace(/[^\d?]/g, '').slice(0, 4))}
+            />
+            <span className="pr-competencia-label">
+              {formatCompetencia(page.month, page.year)}
+            </span>
+          </div>
 
-            return (
-              <React.Fragment key={page.page}>
-                <tr className={rowClass}>
-                  {/* Coluna Pág */}
-                  <td className={cellBorderClass} style={{ textAlign: 'center', fontWeight: 600 }}>
-                    <button
-                      type="button"
-                      onClick={() => togglePageExpand(page.page)}
-                      style={{
-                        background: 'rgba(0, 0, 0, 0.05)',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '0.2rem 0.4rem',
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                        color: 'inherit',
-                        fontWeight: 600,
-                        fontSize: '0.8rem',
-                      }}
-                      title="Ver bases e totais desta página"
-                    >
-                      {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                      {page.page}
-                    </button>
-                  </td>
+          {/* Sumário */}
+          <span className="pr-page-summary">
+            {page.fields.length} verba{page.fields.length !== 1 ? 's' : ''}
+            {page.bases.length > 0 && ` · ${page.bases.length} base${page.bases.length !== 1 ? 's' : ''}`}
+          </span>
+        </div>
 
-                  {/* Coluna Mês */}
-                  <td style={{ textAlign: 'center' }}>
-                    <input
-                      type="text"
-                      className={`cell-input cell-input-month ${page.month.includes('?') ? 'uncertain-cell' : ''}`}
-                      value={page.month}
-                      placeholder="MM"
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        handlePageMetadataChange(pageIdx, 'month', e.target.value)
-                      }
-                    />
-                  </td>
+        <div className="pr-page-header-right">
+          {highlight && highlight.reasons.length > 0 ? (
+            <div
+              className="pr-alert-tag"
+              title={highlight.reasons.join('\n')}
+            >
+              {highlight.color === 'red' ? (
+                <AlertCircle size={13} color="var(--warning-red-border)" style={{ flexShrink: 0 }} />
+              ) : (
+                <AlertTriangle size={13} color="var(--warning-yellow-text)" style={{ flexShrink: 0 }} />
+              )}
+              <span>{highlight.reasons[0]}</span>
+              {highlight.reasons.length > 1 && (
+                <span style={{ opacity: 0.65, flexShrink: 0 }}>+{highlight.reasons.length - 1}</span>
+              )}
+            </div>
+          ) : (
+            <div className="pr-ok-tag">
+              <CheckCircle2 size={13} style={{ flexShrink: 0 }} />
+              <span>Validado</span>
+            </div>
+          )}
+        </div>
+      </button>
 
-                  {/* Coluna Ano */}
-                  <td style={{ textAlign: 'center' }}>
-                    <input
-                      type="text"
-                      className={`cell-input cell-input-year ${page.year.includes('?') ? 'uncertain-cell' : ''}`}
-                      value={page.year}
-                      placeholder="AAAA"
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        handlePageMetadataChange(pageIdx, 'year', e.target.value)
-                      }
-                    />
-                  </td>
+      {/* ── Card Body ── */}
+      {expanded && (
+        <div className="pr-page-body">
+          {/* Seção: Verbas */}
+          <div className="pr-section">
+            <div className="pr-section-header">
+              <Tag size={13} />
+              <span>Verbas</span>
+              <span className="pr-section-count">{page.fields.length}</span>
+            </div>
 
-                  {/* Colunas Transpostas de Verbas (Fields) */}
-                  {distinctLabels.map((label: string, lIdx: number) => {
-                    const field = page.fields.find((f: PayrollField) => f.label === label);
-                    const val = field ? field.value : '';
-                    const isUncertain = val.includes('?');
+            {page.fields.length > 0 ? (
+              <div className="pr-fields-table">
+                {/* Header da tabela de verbas */}
+                <div className="pr-fields-thead">
+                  <span className="pr-field-code">
+                    <Hash size={10} style={{ display: 'inline', marginRight: 2 }} />Cód.
+                  </span>
+                  <span className="pr-field-label">Descrição</span>
+                  <span className="pr-field-ref">Referência</span>
+                  <span className="pr-field-value">Valor</span>
+                </div>
 
-                    return (
-                      <td key={lIdx} style={{ textAlign: 'right' }}>
-                        <input
-                          type="text"
-                          placeholder="-"
-                          className={`cell-input cell-input-money ${isUncertain ? 'uncertain-cell' : ''}`}
-                          value={val}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                            handleFieldValueChange(pageIdx, label, e.target.value)
-                          }
-                        />
-                      </td>
-                    );
-                  })}
+                {page.fields.map((field, fIdx) => (
+                  <FieldRow
+                    key={fIdx}
+                    field={field}
+                    rowIndex={fIdx}
+                    onValueChange={(v) => onFieldValueChange(pageIdx, fIdx, v)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="pr-empty-state">Nenhuma verba extraída nesta página.</div>
+            )}
+          </div>
 
-                  {/* Coluna de Alertas */}
-                  <td>
-                    {highlight && highlight.reasons.length > 0 ? (
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.4rem',
-                          fontSize: '0.76rem',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {highlight.color === 'red' ? (
-                          <AlertCircle size={14} color="#dc3545" />
-                        ) : (
-                          <AlertTriangle size={14} color="#856404" />
-                        )}
-                        <span>{highlight.reasons.join(', ')}</span>
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          fontSize: '0.76rem',
-                          color: '#2b8a3e',
-                          fontWeight: 500,
-                        }}
-                      >
-                        <CheckCircle2 size={13} />
-                        <span>Validado</span>
-                      </div>
-                    )}
-                  </td>
-                </tr>
+          {/* Seção: Bases e Totais */}
+          {page.bases.length > 0 && (
+            <div className="pr-section pr-section-bases">
+              <div className="pr-section-header">
+                <BarChart2 size={13} />
+                <span>Bases e Totais</span>
+                <span className="pr-section-count">{page.bases.length}</span>
+              </div>
+              <div className="pr-bases-grid">
+                {page.bases.map((base, bIdx) => (
+                  <BaseChip
+                    key={bIdx}
+                    base={base}
+                    onValueChange={(v) => onBaseValueChange(pageIdx, bIdx, v)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
-                {/* Linha expansível para Bases e Totais da Página */}
-                {isExpanded && (
-                  <tr style={{ background: 'rgba(245, 245, 247, 0.95)' }}>
-                    <td colSpan={distinctLabels.length + 4} style={{ padding: '0.875rem 1.5rem' }}>
-                      <div style={{ fontSize: '0.8125rem' }}>
-                        <span style={{ fontWeight: 600, color: 'var(--apple-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                          Bases de Cálculo e Totais da Página {page.page} (Seção Separada):
-                        </span>
-                        <div
-                          style={{
-                            display: 'flex',
-                            flexWrap: 'wrap',
-                            gap: '0.75rem',
-                            marginTop: '0.625rem',
-                          }}
-                        >
-                          {page.bases.length > 0 ? (
-                            page.bases.map((base: PayrollBase, bIdx: number) => (
-                              <div
-                                key={bIdx}
-                                style={{
-                                  background: 'white',
-                                  padding: '0.45rem 0.85rem',
-                                  borderRadius: 'var(--radius-sm)',
-                                  border: '1px solid var(--apple-border)',
-                                  boxShadow: 'var(--shadow-apple-subtle)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '0.5rem',
-                                }}
-                              >
-                                <span style={{ color: 'var(--apple-text-secondary)' }}>{base.label}: </span>
-                                <input
-                                  type="text"
-                                  className={`cell-input cell-input-money ${base.value.includes('?') ? 'uncertain-cell' : ''}`}
-                                  style={{ width: '95px', minWidth: '95px', padding: '0.15rem 0.35rem', fontWeight: 600 }}
-                                  value={base.value}
-                                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                    handleBaseValueChange(pageIdx, bIdx, e.target.value)
-                                  }
-                                />
-                              </div>
-                            ))
-                          ) : (
-                            <span style={{ color: 'var(--apple-text-secondary)' }}>Nenhuma base identificada nesta página.</span>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            );
-          })}
-        </tbody>
-      </table>
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export const PayrollGrid: React.FC<PayrollGridProps> = ({ value, onChange }) => {
+  const warnings = computePayrollWarnings(value);
+
+  // ── Mutadores ──────────────────────────────────────────────────────────────
+
+  const handleFieldValueChange = (pageIdx: number, fieldIdx: number, rawVal: string) => {
+    const updated = [...value.pages];
+    const page = { ...updated[pageIdx] };
+    const fields = [...page.fields];
+    fields[fieldIdx] = { ...fields[fieldIdx], value: rawVal };
+    page.fields = fields;
+    updated[pageIdx] = page;
+    onChange({ pages: updated });
+  };
+
+  const handleBaseValueChange = (pageIdx: number, baseIdx: number, rawVal: string) => {
+    const updated = [...value.pages];
+    const page = { ...updated[pageIdx] };
+    const bases = [...page.bases];
+    bases[baseIdx] = { ...bases[baseIdx], value: rawVal };
+    page.bases = bases;
+    updated[pageIdx] = page;
+    onChange({ pages: updated });
+  };
+
+  const handleMetadataChange = (pageIdx: number, field: 'year' | 'month', val: string) => {
+    const updated = [...value.pages];
+    updated[pageIdx] = { ...updated[pageIdx], [field]: val };
+    onChange({ pages: updated });
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  if (value.pages.length === 0) {
+    return (
+      <div className="pr-empty-state" style={{ padding: '2.5rem', textAlign: 'center' }}>
+        Nenhuma página extraída.
+      </div>
+    );
+  }
+
+  return (
+    <div className="pr-grid-container">
+      {value.pages.map((page, pageIdx) => (
+        <PageCard
+          key={`${page.page}-${pageIdx}`}
+          page={page}
+          pageIdx={pageIdx}
+          highlight={warnings.get(page.page)}
+          onFieldValueChange={handleFieldValueChange}
+          onBaseValueChange={handleBaseValueChange}
+          onMetadataChange={handleMetadataChange}
+          defaultExpanded={pageIdx === 0}
+        />
+      ))}
     </div>
   );
 };
