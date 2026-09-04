@@ -5,10 +5,14 @@ pessoais substituídos.
 
 ```
 exemplos/
-├── cartao-ponto-1.pdf
-├── cartao-ponto-2.pdf
-├── holerite-1.pdf
-└── holerite-2.pdf
+├── time-card-01.pdf
+├── time-card-02.pdf
+├── time-card-03.pdf
+├── time-card-04.pdf
+├── payroll-01.pdf
+├── payroll-02.pdf
+├── payroll-03.pdf
+└── payroll-04.pdf
 ```
 
 ## Importante

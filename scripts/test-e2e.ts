@@ -10,11 +10,11 @@ async function testE2E(): Promise<void> {
   console.log('Healthz status:', healthRes.status, await healthRes.json());
 
   console.log('--- 2. Testando Upload de Cartão de Ponto ---');
-  const pdfBuffer = fs.readFileSync(path.join(process.cwd(), 'exemplos', 'cartao-ponto-1.pdf'));
+  const pdfBuffer = fs.readFileSync(path.join(process.cwd(), 'exemplos', 'time-card-01.pdf'));
   const blob = new Blob([pdfBuffer], { type: 'application/pdf' });
 
   const formData = new FormData();
-  formData.append('arquivo', blob, 'cartao-ponto-1.pdf');
+  formData.append('arquivo', blob, 'time-card-01.pdf');
   formData.append('tipo', 'cartao-ponto');
 
   const uploadRes = await fetch(`${baseUrl}/api/transcricoes`, {
