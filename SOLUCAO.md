@@ -14,7 +14,7 @@ Conforme solicitado no `README.md` e `INSTRUCOES.md`, aqui estão os 5 entregáv
 2. **URL da Aplicação Publicada (Render):** [https://desafio-programador-8lr6.onrender.com/](https://desafio-programador-8lr6.onrender.com/)
 3. **`SOLUCAO.md`:** Este documento técnico (arquitetura, operação, segurança e decisões).
 4. **`PROCESSO.md`:** Relatório detalhado sobre condução com IA, correções manuais e respostas reflexivas.
-5. **Planilhas Geradas em `exemplos/`:** Todas as 12 planilhas resultantes dos 4 PDFs de teste (`.xlsx`, `.csv` e `.json`) geradas e versionadas no repositório.
+5. **Planilhas Geradas em `exemplos/`:** Todas as 24 planilhas resultantes dos 8 PDFs de teste (`.xlsx`, `.csv` e `.json`) geradas e versionadas no repositório.
 
 ---
 
