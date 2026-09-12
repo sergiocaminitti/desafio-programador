@@ -61,7 +61,7 @@ router.post('/api/transcricoes', upload.single('arquivo'), async (req: Request, 
     // Dispara processamento assíncrono
     processPdfAsync(id, tipo, buffer);
 
-    res.status(202).json({ id });
+    res.status(202).json({ id, fileName: file.originalname });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Erro interno no upload';
     res.status(500).json({ erro: message });
@@ -87,6 +87,7 @@ router.get('/api/transcricoes/:id', (req: Request, res: Response): void => {
     status: record.status,
     erro: record.erro,
     value: record.value,
+    fileName: record.fileName,
   });
 });
 
@@ -167,10 +168,10 @@ router.get('/api/transcricoes/:id/planilha', async (req: Request, res: Response)
 });
 
 /**
- * GET /api/transcricoes/:id/pdf
- * Serve o PDF original para o visualizador integrado
+ * GET /api/transcricoes/:id/pdf e GET /api/transcricoes/:id/arquivo/:filename
+ * Serve o PDF original para o visualizador integrado com o nome correto do arquivo
  */
-router.get('/api/transcricoes/:id/pdf', (req: Request, res: Response): void => {
+const servePdf = (req: Request, res: Response): void => {
   const { id } = req.params;
   const pdfBuffer = storage.getPdf(id);
 
@@ -179,10 +180,29 @@ router.get('/api/transcricoes/:id/pdf', (req: Request, res: Response): void => {
     return;
   }
 
+  const record = storage.get(id);
+  const currentFilename = (req.params as any).filename;
+
+  // Se o registro tem o nome original e a requisição foi feita por URL genérica,
+  // redireciona para a URL canônica com o nome exato do arquivo para que a toolbar do PDF mostre o nome correto
+  if (record?.fileName && (!currentFilename || currentFilename === 'documento.pdf')) {
+    const encodedTarget = encodeURIComponent(record.fileName);
+    if (currentFilename !== record.fileName) {
+      res.redirect(302, `/api/transcricoes/${id}/arquivo/${encodedTarget}`);
+      return;
+    }
+  }
+
+  const rawFileName = currentFilename || record?.fileName || `documento-${id}.pdf`;
+  const fileName = rawFileName.toLowerCase().endsWith('.pdf') ? rawFileName : `${rawFileName}.pdf`;
+
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `inline; filename="documento-${id}.pdf"`);
+  res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
   res.send(pdfBuffer);
-});
+};
+
+router.get('/api/transcricoes/:id/pdf', servePdf);
+router.get('/api/transcricoes/:id/arquivo/:filename', servePdf);
 
 /**
  * GET /healthz

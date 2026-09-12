@@ -87,5 +87,11 @@ describe('HTTP API Endpoints', () => {
     const xlsxRes = await fetch(`${baseUrl}/api/transcricoes/${testId}/planilha?formato=xlsx`);
     expect(xlsxRes.status).toBe(200);
     expect(xlsxRes.headers.get('content-type')).toContain('spreadsheetml');
+
+    // 4. GET /api/transcricoes/:id/arquivo/:filename
+    const pdfRes = await fetch(`${baseUrl}/api/transcricoes/${testId}/arquivo/test.pdf`);
+    expect(pdfRes.status).toBe(200);
+    expect(pdfRes.headers.get('content-type')).toBe('application/pdf');
+    expect(pdfRes.headers.get('content-disposition')).toContain('test.pdf');
   });
 });

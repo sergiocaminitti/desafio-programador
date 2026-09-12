@@ -3,9 +3,10 @@ import { FileText } from 'lucide-react';
 
 interface PdfViewerProps {
   transcriptionId: string | null;
+  fileName?: string;
 }
 
-export const PdfViewer: React.FC<PdfViewerProps> = ({ transcriptionId }) => {
+export const PdfViewer: React.FC<PdfViewerProps> = ({ transcriptionId, fileName }) => {
   if (!transcriptionId) {
     return (
       <div
@@ -47,13 +48,14 @@ export const PdfViewer: React.FC<PdfViewerProps> = ({ transcriptionId }) => {
     );
   }
 
-  const pdfUrl = `/api/transcricoes/${transcriptionId}/pdf`;
+  const safeFileName = fileName || 'documento.pdf';
+  const pdfUrl = `/api/transcricoes/${transcriptionId}/arquivo/${encodeURIComponent(safeFileName)}`;
 
   return (
     <div className="pdf-iframe-container">
       <iframe
         src={pdfUrl}
-        title="Visualizador de PDF Original"
+        title={fileName ? `Visualizador de ${fileName}` : 'Visualizador de PDF Original'}
         className="pdf-iframe"
       />
     </div>

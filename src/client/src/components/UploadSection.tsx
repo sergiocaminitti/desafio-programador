@@ -6,7 +6,7 @@ interface UploadSectionProps {
   tipo: DocumentType;
   onTipoChange: (tipo: DocumentType) => void;
   onUploadStart: () => void;
-  onUploadSuccess: (id: string, tipo: DocumentType) => void;
+  onUploadSuccess: (id: string, tipo: DocumentType, fileName: string) => void;
   onUploadError: (err: string) => void;
   isProcessing: boolean;
 }
@@ -47,8 +47,8 @@ export const UploadSection: React.FC<UploadSectionProps> = ({
         throw new Error(data.erro || `Erro HTTP ${response.status}`);
       }
 
-      const data = (await response.json()) as { id: string };
-      onUploadSuccess(data.id, tipo);
+      const data = (await response.json()) as { id: string; fileName?: string };
+      onUploadSuccess(data.id, tipo, data.fileName || file.name);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Falha ao enviar arquivo';
       onUploadError(message);

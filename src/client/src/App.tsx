@@ -28,6 +28,7 @@ export const App: React.FC = () => {
   const [tipo, setTipo] = useState<DocumentType>('cartao-ponto');
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [record, setRecord] = useState<TranscriptionRecord | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -102,9 +103,12 @@ export const App: React.FC = () => {
     setSaveStatus('idle');
   };
 
-  const handleUploadSuccess = (id: string, uploadedTipo: DocumentType) => {
+  const handleUploadSuccess = (id: string, uploadedTipo: DocumentType, fileName?: string) => {
     setCurrentId(id);
     setTipo(uploadedTipo);
+    if (fileName) {
+      setUploadedFileName(fileName);
+    }
     setIsProcessing(true);
   };
 
@@ -301,7 +305,26 @@ export const App: React.FC = () => {
             <div className="panel-header">
               <div className="panel-title">
                 <Clock size={16} color="var(--apple-blue)" />
-                Documento Original (PDF)
+                <span>Documento Original (PDF)</span>
+                {(record?.fileName || uploadedFileName) && (
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      fontWeight: 500,
+                      color: 'var(--apple-text-secondary)',
+                      background: 'rgba(0, 0, 0, 0.04)',
+                      padding: '0.15rem 0.5rem',
+                      borderRadius: 'var(--radius-pill)',
+                      maxWidth: '180px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={record?.fileName || uploadedFileName || ''}
+                  >
+                    {record?.fileName || uploadedFileName}
+                  </span>
+                )}
               </div>
               {currentId && (
                 <span style={{ fontSize: '0.75rem', color: 'var(--apple-text-tertiary)' }}>
@@ -310,7 +333,7 @@ export const App: React.FC = () => {
               )}
             </div>
             <div className="panel-body">
-              <PdfViewer transcriptionId={currentId} />
+              <PdfViewer transcriptionId={currentId} fileName={record?.fileName || uploadedFileName || undefined} />
             </div>
           </div>
 
