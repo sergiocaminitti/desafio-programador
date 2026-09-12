@@ -265,13 +265,14 @@ function pushField(
   code: string,
   rawLabel: string,
   reference: string,
-  value: string
+  value: string,
+  subFolha?: string
 ) {
   const lab = normalizeFieldLabel(collapseSpaces(rawLabel).replace(/:$/, ''));
   if (!lab || lab.length < 2) return;
   if (HEADER_FIELD_RE.test(lab)) return;
   if (SKIP_FICHA_LABEL_RE.test(lab)) return;
-  fields.push({ code, label: lab, reference, value });
+  fields.push({ code, label: lab, reference, value, ...(subFolha ? { subFolha } : {}) });
 }
 
 function pushBase(bases: PayrollBase[], rawLabel: string, value: string) {
@@ -290,7 +291,7 @@ function pushBase(bases: PayrollBase[], rawLabel: string, value: string) {
  *
  * Exceção: se o mesmo label tem valores **diferentes**, mantém ambos porque representam
  * lançamentos distintos (ex: PREVI PESSOAL PB2 normal vs PREVI PESSOAL PB2 ACERTO).
- * Nesses casos, o segundo recebe um sufixo numérico para diferenciação.
+ * Nesses casos, o segundo recebe identificação semântica da sub-folha (ex: ACERTO) ou sufixo numérico.
  */
 function deduplicateFields(fields: PayrollField[]): PayrollField[] {
   const seen = new Map<string, number>(); // label → ocorrências
@@ -309,8 +310,9 @@ function deduplicateFields(fields: PayrollField[]): PayrollField[] {
         // Mesmo valor → duplicata literal (OCR duplicou), descarta
         continue;
       }
-      // Valor diferente → lançamento distinto, mantém com sufixo
-      const newLabel = `${f.label} (${count + 1})`;
+      // Valor diferente → lançamento distinto, mantém com contexto de subfolha ou sufixo
+      const suffix = f.subFolha ? ` (${f.subFolha})` : ` (${count + 1})`;
+      const newLabel = `${f.label}${suffix}`;
       result.push({ ...f, label: newLabel });
       seen.set(f.label, count + 1);
     }
@@ -447,7 +449,8 @@ function parseFichaLine(line: ExtractedLine, fields: PayrollField[], bases: Payr
 export function parseStandardPayrollLine(
   lineText: string,
   fields: PayrollField[],
-  bases: PayrollBase[]
+  bases: PayrollBase[],
+  subFolha?: string
 ) {
   const text = collapseSpaces(despaceText(lineText));
   if (!text) return;
@@ -503,7 +506,7 @@ export function parseStandardPayrollLine(
       if (isBaseLabel(label) || isBaseLabel(raw)) {
         pushBase(bases, label || raw, seg.value);
       } else {
-        pushField(fields, code, label, seg.ref, seg.value);
+        pushField(fields, code, label, seg.ref, seg.value, subFolha);
       }
     }
     return;
@@ -518,7 +521,7 @@ export function parseStandardPayrollLine(
   if (isBaseLabel(label) || isBaseLabel(labelPart)) {
     pushBase(bases, label || labelPart, m[1]);
   } else {
-    pushField(fields, code, label, '', m[1]);
+    pushField(fields, code, label, '', m[1], subFolha);
   }
 }
 
@@ -697,9 +700,22 @@ export function extractPayroll(doc: ExtractedDocument): PayrollValue {
     const parseLines = (lines: ExtractedLine[]) => {
       const f: PayrollField[] = [];
       const b: PayrollBase[] = [];
+      let currentSubFolha = '';
+
       for (let lIdx = 0; lIdx < lines.length; lIdx++) {
         const line = lines[lIdx];
         const text = collapseSpaces(line.text);
+
+        // Identifica seção / tipo de folha (ex: "Folha de Pagamento: MÊS", "Folha de Pagamento: ACERTO")
+        const folhaMatch = text.match(/folha\s+de\s+pagamento\s*:\s*([A-Za-zÀ-ÿ0-9º°\s\-]+)/i);
+        if (folhaMatch) {
+          const type = folhaMatch[1].trim().toUpperCase();
+          if (type && type !== 'MÊS' && type !== 'MES' && type !== 'NORMAL') {
+            currentSubFolha = type;
+          } else {
+            currentSubFolha = '';
+          }
+        }
 
         if (
           /sal[aá]rio\s*base/i.test(text) &&
@@ -727,7 +743,7 @@ export function extractPayroll(doc: ExtractedDocument): PayrollValue {
           }
         }
 
-        parseStandardPayrollLine(line.text, f, b);
+        parseStandardPayrollLine(line.text, f, b, currentSubFolha);
       }
       return { fields: f, bases: b };
     };

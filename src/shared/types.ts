@@ -42,6 +42,7 @@ export interface PayrollField {
   label: string;
   reference: string;
   value: string;
+  subFolha?: string;
 }
 
 export interface PayrollBase {

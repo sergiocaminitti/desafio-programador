@@ -81,6 +81,24 @@ const FieldRow: React.FC<FieldRowProps> = ({ field, onValueChange, rowIndex }) =
       {/* Label */}
       <span className="pr-field-label" title={field.label}>
         {field.label}
+        {field.subFolha && (
+          <span
+            style={{
+              fontSize: '0.65rem',
+              fontWeight: 600,
+              color: 'var(--apple-blue)',
+              background: 'rgba(0, 113, 227, 0.08)',
+              padding: '0.1rem 0.35rem',
+              borderRadius: '4px',
+              marginLeft: '0.4rem',
+              letterSpacing: '0.02em',
+              verticalAlign: 'middle',
+            }}
+            title={`Sub-folha: ${field.subFolha}`}
+          >
+            {field.subFolha}
+          </span>
+        )}
       </span>
 
       {/* Referência */}
